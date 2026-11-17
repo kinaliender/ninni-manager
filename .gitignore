@@ -1,0 +1,21 @@
+.gradle/
+build/
+local.properties
+.idea/
+*.iml
+captures/
+.DS_Store
+.kotlin/
+node_modules/
+xcuserdata/
+*.xcuserstate
+DerivedData/
+
+# Build outputs and signing keys never go into the repository
+*.apk
+*.aab
+*.jks
+*.keystore
+
+# The iOS remote is not published yet
+ios/

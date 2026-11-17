@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dim palette: the phone stays next to a sleeping child. -->
+    <color name="background">#000000</color>
+    <color name="surface">#0E1018</color>
+    <color name="text">#B9BDD0</color>
+    <color name="dim">#6E7389</color>
+    <color name="moon">#D9BF7E</color>
+    <color name="ok">#78B088</color>
+    <color name="bad">#C97A7A</color>
+    <color name="ic_launcher_background">#2A1F4A</color>
+</resources>

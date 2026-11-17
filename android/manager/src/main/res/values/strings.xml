@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Ninni Remote</string>
+    <string name="player_name">Ninni Player</string>
+    <string name="pin_button">Code</string>
+
+    <string name="phase_no_permission">Bluetooth permission needed. Tap to allow.</string>
+    <string name="phase_bluetooth_off">Bluetooth is off</string>
+    <string name="phase_scanning">Looking for Ninni Player…</string>
+    <string name="phase_not_found">Ninni Player not found. Is its service running? Retrying… (tap to retry now)</string>
+    <string name="phase_connecting">Connecting…</string>
+    <string name="phase_need_pin">Enter the pairing code</string>
+    <string name="phase_wrong_pin">Wrong code</string>
+    <string name="phase_connected">Connected · %1$s</string>
+
+    <string name="now_playing">Now playing</string>
+    <string name="no_track">No track info</string>
+    <string name="volume_label">Volume</string>
+    <string name="volume_value">%1$d%%</string>
+    <string name="volume_steps">Step %1$d of %2$d</string>
+    <string name="volume_unknown">–</string>
+    <string name="battery">Player battery %1$d%%</string>
+    <string name="battery_charging">Player battery %1$d%% · charging</string>
+    <string name="no_access">Notification access is off on the player, so the track name is hidden.</string>
+    <string name="keys_hint">While this screen is open, the phone\'s volume buttons change the player\'s volume.</string>
+
+    <string name="cap_off">No volume limit</string>
+    <string name="cap_value">Volume limit %1$d%% · step %2$d</string>
+    <string name="cap_down">Lower the volume limit</string>
+    <string name="cap_up">Raise the volume limit</string>
+
+    <string name="sleep_label">Sleep timer</string>
+    <string name="minutes_short">%1$d min</string>
+    <string name="sleep_fade">Fade out gently in the last 10 minutes</string>
+    <string name="sleep_fade_in">Fading starts in %1$s</string>
+    <string name="sleep_fading">Fading out gently…</string>
+    <string name="sleep_stop">The music stops when time is up</string>
+
+    <string name="shuffle">Shuffle</string>
+    <string name="repeat">Repeat</string>
+    <string name="rewind">Back %1$d seconds</string>
+    <string name="forward">Forward %1$d seconds</string>
+
+    <string name="pin_title">Pairing code</string>
+    <string name="pin_message">Enter the 4-digit code shown on Ninni Player.</string>
+    <string name="pin_wrong">Wrong code. Check the code on Ninni Player and try again in a few seconds.</string>
+    <string name="connect">Connect</string>
+    <string name="cancel">Cancel</string>
+
+    <string name="previous">Previous</string>
+    <string name="next">Next</string>
+    <string name="play">Play</string>
+    <string name="pause">Pause</string>
+    <string name="volume_down">Volume down</string>
+    <string name="volume_up">Volume up</string>
+</resources>

@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Ninni Kumanda</string>
+    <string name="player_name">Ninni Çalar</string>
+    <string name="pin_button">Kod</string>
+
+    <string name="phase_no_permission">Bluetooth izni gerekli. İzin vermek için dokunun.</string>
+    <string name="phase_bluetooth_off">Bluetooth kapalı</string>
+    <string name="phase_scanning">Ninni Çalar aranıyor…</string>
+    <string name="phase_not_found">Ninni Çalar bulunamadı. Servisi açık mı? Tekrar deneniyor… (hemen denemek için dokunun)</string>
+    <string name="phase_connecting">Bağlanıyor…</string>
+    <string name="phase_need_pin">Eşleşme kodunu girin</string>
+    <string name="phase_wrong_pin">Kod yanlış</string>
+    <string name="phase_connected">Bağlı · %1$s</string>
+
+    <string name="now_playing">Şu an çalan</string>
+    <string name="no_track">Şarkı bilgisi yok</string>
+    <string name="volume_label">Ses</string>
+    <string name="volume_value">%%%1$d</string>
+    <string name="volume_steps">Kademe %1$d / %2$d</string>
+    <string name="volume_unknown">–</string>
+    <string name="battery">Ninni Çalar pili %%%1$d</string>
+    <string name="battery_charging">Ninni Çalar pili %%%1$d · şarj oluyor</string>
+    <string name="no_access">Ninni Çalar\'da bildirim erişimi kapalı, bu yüzden şarkı adı görünmüyor.</string>
+    <string name="keys_hint">Bu ekran açıkken telefonun ses tuşları Ninni Çalar\'ın sesini değiştirir.</string>
+
+    <string name="cap_off">Ses sınırı yok</string>
+    <string name="cap_value">Ses sınırı %%%1$d · kademe %2$d</string>
+    <string name="cap_down">Ses sınırını düşür</string>
+    <string name="cap_up">Ses sınırını yükselt</string>
+
+    <string name="sleep_label">Uyku zamanlayıcısı</string>
+    <string name="minutes_short">%1$d dk</string>
+    <string name="sleep_fade">Son 10 dakikada sesi yavaşça kıs</string>
+    <string name="sleep_fade_in">Ses %1$s sonra kısılmaya başlayacak</string>
+    <string name="sleep_fading">Ses yavaşça kısılıyor…</string>
+    <string name="sleep_stop">Süre bitince müzik duracak</string>
+
+    <string name="shuffle">Karışık çal</string>
+    <string name="repeat">Tekrarla</string>
+    <string name="rewind">%1$d saniye geri</string>
+    <string name="forward">%1$d saniye ileri</string>
+
+    <string name="pin_title">Eşleşme kodu</string>
+    <string name="pin_message">Ninni Çalar ekranındaki 4 haneli kodu girin.</string>
+    <string name="pin_wrong">Kod yanlış. Ninni Çalar ekranındaki kodu kontrol edip birkaç saniye sonra tekrar deneyin.</string>
+    <string name="connect">Bağlan</string>
+    <string name="cancel">İptal</string>
+
+    <string name="previous">Önceki</string>
+    <string name="next">Sonraki</string>
+    <string name="play">Oynat</string>
+    <string name="pause">Duraklat</string>
+    <string name="volume_down">Sesi kıs</string>
+    <string name="volume_up">Sesi aç</string>
+</resources>

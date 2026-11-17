@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Ninni Player</string>
+    <string name="intro">Leave this phone next to the baby. The manager app controls it over Bluetooth.</string>
+
+    <string name="pin_label">Pairing code</string>
+    <string name="pin_hint">Type this code into the manager app once.</string>
+    <string name="new_pin">New code</string>
+
+    <string name="service_label">Service</string>
+    <string name="start">Start</string>
+    <string name="stop">Stop</string>
+    <string name="status_stopped">Stopped</string>
+    <string name="status_starting">Starting…</string>
+    <string name="status_running">Broadcasting · %1$d manager(s) connected</string>
+
+    <string name="problem_no_bluetooth">This phone has no Bluetooth</string>
+    <string name="problem_bluetooth_off">Bluetooth is off</string>
+    <string name="problem_no_permission">Bluetooth permission needed</string>
+    <string name="problem_adv_unsupported">This phone cannot broadcast over BLE (peripheral mode not supported)</string>
+    <string name="problem_adv_failed">Broadcast failed (code %1$d), retrying…</string>
+    <string name="problem_server_failed">Bluetooth server could not start</string>
+
+    <string name="now_playing_label">Now playing</string>
+    <string name="nothing_playing">No track info</string>
+    <string name="needs_access">Allow notification access to see the track name</string>
+    <string name="playing">Playing</string>
+    <string name="paused">Paused</string>
+    <string name="charging">" (charging)"</string>
+    <string name="levels">%1$s · Volume %2$d/%3$d · Battery %4$d%%%5$s</string>
+    <string name="extra_cap">Volume limit %1$d/%2$d</string>
+    <string name="extra_sleep">Sleep timer: %1$d min left</string>
+    <string name="extra_sleep_fading">Sleep timer: fading out, %1$d min left</string>
+
+    <string name="checks_label">Setup</string>
+    <string name="check_ok">✓  %1$s</string>
+    <string name="check_missing">✗  %1$s</string>
+    <string name="check_bluetooth">Bluetooth on</string>
+    <string name="check_permission">Bluetooth permission</string>
+    <string name="check_advertising">BLE broadcast support</string>
+    <string name="check_advertising_unknown">BLE broadcast support: turn Bluetooth on to check</string>
+    <string name="check_notification">Notification access (track name)</string>
+    <string name="check_battery">Battery optimization off</string>
+    <string name="restricted_hint">If the switch is greyed out: Settings › Apps › Ninni Player › ⋮ › Allow restricted settings, then try again.</string>
+    <string name="open">Open</string>
+    <string name="grant">Allow</string>
+
+    <string name="device_info">%1$s · Android %2$s (API %3$d)</string>
+
+    <string name="channel_name">Background service</string>
+    <string name="notification_title">Ninni Player is running</string>
+    <string name="notification_text">The manager can connect over Bluetooth</string>
+</resources>

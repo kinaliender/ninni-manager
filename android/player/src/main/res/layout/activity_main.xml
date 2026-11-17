@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fitsSystemWindows="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/app_name"
+            android:textColor="@color/moon"
+            android:textSize="24sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="@string/intro"
+            android:textColor="@color/dim"
+            android:textSize="14sp" />
+
+        <!-- Pairing code -->
+        <LinearLayout style="@style/Card">
+
+            <TextView
+                style="@style/Label"
+                android:text="@string/pin_label" />
+
+            <TextView
+                android:id="@+id/pinText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="monospace"
+                android:textColor="@color/moon"
+                android:textSize="44sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/pin_hint"
+                android:textColor="@color/dim"
+                android:textSize="13sp" />
+
+            <Button
+                android:id="@+id/newPin"
+                style="@style/SmallButton"
+                android:layout_marginTop="8dp"
+                android:text="@string/new_pin" />
+        </LinearLayout>
+
+        <!-- Service -->
+        <LinearLayout style="@style/Card">
+
+            <TextView
+                style="@style/Label"
+                android:text="@string/service_label" />
+
+            <TextView
+                android:id="@+id/serviceStatus"
+                style="@style/Body" />
+
+            <Button
+                android:id="@+id/startStop"
+                style="@style/SmallButton"
+                android:layout_marginTop="8dp" />
+        </LinearLayout>
+
+        <!-- Now playing -->
+        <LinearLayout style="@style/Card">
+
+            <TextView
+                style="@style/Label"
+                android:text="@string/now_playing_label" />
+
+            <TextView
+                android:id="@+id/nowPlaying"
+                style="@style/Body" />
+
+            <TextView
+                android:id="@+id/levels"
+                style="@style/Body"
+                android:layout_marginTop="4dp"
+                android:textColor="@color/dim" />
+
+            <TextView
+                android:id="@+id/extras"
+                style="@style/Body"
+                android:layout_marginTop="4dp"
+                android:textColor="@color/moon"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <!-- Setup checklist -->
+        <LinearLayout style="@style/Card">
+
+            <TextView
+                style="@style/Label"
+                android:text="@string/checks_label" />
+
+            <LinearLayout style="@style/CheckRow">
+                <TextView android:id="@+id/checkBluetooth" style="@style/CheckText" />
+                <Button android:id="@+id/btnBluetooth" style="@style/SmallButton" android:text="@string/open" />
+            </LinearLayout>
+
+            <LinearLayout style="@style/CheckRow">
+                <TextView android:id="@+id/checkPermission" style="@style/CheckText" />
+                <Button android:id="@+id/btnPermission" style="@style/SmallButton" android:text="@string/grant" />
+            </LinearLayout>
+
+            <LinearLayout style="@style/CheckRow">
+                <TextView android:id="@+id/checkAdvertising" style="@style/CheckText" />
+            </LinearLayout>
+
+            <LinearLayout style="@style/CheckRow">
+                <TextView android:id="@+id/checkNotification" style="@style/CheckText" />
+                <Button android:id="@+id/btnNotification" style="@style/SmallButton" android:text="@string/open" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/restrictedHint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/restricted_hint"
+                android:textColor="@color/dim"
+                android:textSize="12sp"
+                android:visibility="gone" />
+
+            <LinearLayout style="@style/CheckRow">
+                <TextView android:id="@+id/checkBattery" style="@style/CheckText" />
+                <Button android:id="@+id/btnBattery" style="@style/SmallButton" android:text="@string/open" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/deviceInfo"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:textColor="@color/dim"
+            android:textSize="12sp" />
+    </LinearLayout>
+</ScrollView>

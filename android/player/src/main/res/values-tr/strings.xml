@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Ninni Çalar</string>
+    <string name="intro">Bu telefon bebeğin yanında kalır. Yönetici uygulama onu Bluetooth üzerinden kontrol eder.</string>
+
+    <string name="pin_label">Eşleşme kodu</string>
+    <string name="pin_hint">Bu kodu yönetici uygulamaya bir kez girin.</string>
+    <string name="new_pin">Yeni kod</string>
+
+    <string name="service_label">Servis</string>
+    <string name="start">Başlat</string>
+    <string name="stop">Durdur</string>
+    <string name="status_stopped">Durdu</string>
+    <string name="status_starting">Başlatılıyor…</string>
+    <string name="status_running">Yayında · %1$d yönetici bağlı</string>
+
+    <string name="problem_no_bluetooth">Bu telefonda Bluetooth yok</string>
+    <string name="problem_bluetooth_off">Bluetooth kapalı</string>
+    <string name="problem_no_permission">Bluetooth izni gerekli</string>
+    <string name="problem_adv_unsupported">Bu telefon BLE yayını yapamıyor (çevre birimi modu desteklenmiyor)</string>
+    <string name="problem_adv_failed">Yayın başlatılamadı (kod %1$d), yeniden deneniyor…</string>
+    <string name="problem_server_failed">Bluetooth sunucusu başlatılamadı</string>
+
+    <string name="now_playing_label">Şu an çalan</string>
+    <string name="nothing_playing">Şarkı bilgisi yok</string>
+    <string name="needs_access">Şarkı adını görmek için bildirim erişimi verin</string>
+    <string name="playing">Çalıyor</string>
+    <string name="paused">Duraklatıldı</string>
+    <string name="charging">" (şarj oluyor)"</string>
+    <string name="levels">%1$s · Ses %2$d/%3$d · Pil %%%4$d%5$s</string>
+    <string name="extra_cap">Ses sınırı %1$d/%2$d</string>
+    <string name="extra_sleep">Uyku zamanlayıcısı: %1$d dk kaldı</string>
+    <string name="extra_sleep_fading">Uyku zamanlayıcısı: ses kısılıyor, %1$d dk kaldı</string>
+
+    <string name="checks_label">Kurulum</string>
+    <string name="check_ok">✓  %1$s</string>
+    <string name="check_missing">✗  %1$s</string>
+    <string name="check_bluetooth">Bluetooth açık</string>
+    <string name="check_permission">Bluetooth izni</string>
+    <string name="check_advertising">BLE yayın desteği</string>
+    <string name="check_advertising_unknown">BLE yayın desteği: kontrol için Bluetooth\'u açın</string>
+    <string name="check_notification">Bildirim erişimi (şarkı adı)</string>
+    <string name="check_battery">Pil optimizasyonu kapalı</string>
+    <string name="restricted_hint">Anahtar gri görünüyorsa: Ayarlar › Uygulamalar › Ninni Çalar › ⋮ › Kısıtlanmış ayarlara izin ver, sonra tekrar deneyin.</string>
+    <string name="open">Aç</string>
+    <string name="grant">İzin ver</string>
+
+    <string name="device_info">%1$s · Android %2$s (API %3$d)</string>
+
+    <string name="channel_name">Arka plan servisi</string>
+    <string name="notification_title">Ninni Çalar çalışıyor</string>
+    <string name="notification_text">Yönetici Bluetooth üzerinden bağlanabilir</string>
+</resources>
