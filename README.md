@@ -25,10 +25,17 @@ internet, no account and no server.
 - **Remote:** any Android 10+ phone with Bluetooth.
 - Range is that of Bluetooth: one or two rooms away, depending on the walls.
 
-## Build and install
+## Install
 
-There are no prebuilt APKs; build them from this repository. You need a JDK 17 (Gradle 8.10.2
-does not run on newer JDKs) and the Android SDK.
+Download the APKs from the [latest release](https://github.com/kinaliender/ninni-manager/releases/latest):
+`ninni-player-<version>.apk` on the phone next to the baby, `ninni-remote-<version>.apk` on the
+parents' phones. Allow installing apps from that source when Android asks. Use the same
+version of both apps; a newer release installs over the older one.
+
+## Build from source
+
+You need a JDK 17 (Gradle 8.10.2 does not run on newer JDKs) and the Android SDK. Your build is
+signed with your own debug key, so uninstall a release APK before installing it.
 
 ```sh
 cd android

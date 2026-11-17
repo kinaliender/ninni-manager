@@ -25,10 +25,17 @@ kontrol eder. Wi-Fi, internet, hesap ya da sunucu gerekmez.
 - **Kumanda:** Bluetooth'u olan herhangi bir Android 10+ telefon.
 - Menzil Bluetooth menzilidir: duvarlara göre bir iki oda öte.
 
-## Derleme ve kurulum
+## Kurulum
 
-Hazır APK yoktur; bu repodan derleyin. JDK 17 (Gradle 8.10.2 daha yeni JDK'larda çalışmaz) ve
-Android SDK gerekir.
+APK'ları [son sürümden](https://github.com/kinaliender/ninni-manager/releases/latest) indirin:
+bebeğin yanındaki telefona `ninni-player-<sürüm>.apk`, ebeveynlerin telefonlarına
+`ninni-remote-<sürüm>.apk`. Android sorarsa bu kaynaktan uygulama yüklemeye izin verin. İki
+uygulamanın aynı sürümünü kullanın; yeni sürüm eskisinin üstüne kurulur.
+
+## Kaynaktan derleme
+
+JDK 17 (Gradle 8.10.2 daha yeni JDK'larda çalışmaz) ve Android SDK gerekir. Kendi derlediğiniz
+APK sizin debug anahtarınızla imzalanır; kurmadan önce sürümden kurulan uygulamayı kaldırın.
 
 ```sh
 cd android
