@@ -374,7 +374,7 @@ class MainActivity : Activity() {
             setOnItemClickListener { _, _, position, _ -> playItem(adapter.getItem(position)) }
         }
         queueAdapter = adapter
-        queueDialog = AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
+        queueDialog = AlertDialog.Builder(this, R.style.Dialog)
             .setTitle(queue.title ?: getString(R.string.queue))
             .setView(list)
             .setNegativeButton(R.string.close, null)
@@ -509,7 +509,7 @@ class MainActivity : Activity() {
             setPadding(padding, padding / 2, padding, 0)
             addView(input)
         }
-        pinDialog = AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
+        pinDialog = AlertDialog.Builder(this, R.style.Dialog)
             .setTitle(R.string.pin_title)
             .setMessage(if (wrong) R.string.pin_wrong else R.string.pin_message)
             .setView(container)

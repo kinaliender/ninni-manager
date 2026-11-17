@@ -3,6 +3,7 @@
     <!-- Dim palette: the phone stays next to a sleeping child. -->
     <color name="background">#000000</color>
     <color name="surface">#0E1018</color>
+    <color name="dialog">#161A26</color>
     <color name="text">#B9BDD0</color>
     <color name="dim">#6E7389</color>
     <color name="moon">#D9BF7E</color>

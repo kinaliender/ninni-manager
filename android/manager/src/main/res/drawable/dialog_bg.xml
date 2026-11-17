@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Dialog window: the dim palette instead of the platform's bright grey. -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:inset="16dp">
+    <shape android:shape="rectangle">
+        <solid android:color="@color/dialog" />
+        <corners android:radius="14dp" />
+    </shape>
+</inset>
