@@ -358,7 +358,7 @@ class MainActivity : Activity() {
         if (snapshot.queue == null) {
             queueDialog?.dismiss()
         } else {
-            queueAdapter?.show(snapshot.queue, state?.queueActive)
+            queueAdapter?.show(snapshot.queue, snapshot.queueActive)
             queueDialog?.setTitle(snapshot.queue.title ?: getString(R.string.queue))
         }
     }
@@ -367,7 +367,7 @@ class MainActivity : Activity() {
         if (queueDialog?.isShowing == true || isFinishing) return
         val snapshot = connection.snapshot
         val queue = snapshot.queue ?: return
-        val adapter = QueueAdapter(this).apply { show(queue, snapshot.state?.queueActive) }
+        val adapter = QueueAdapter(this).apply { show(queue, snapshot.queueActive) }
         val list = ListView(this).apply {
             this.adapter = adapter
             divider = null
@@ -388,8 +388,10 @@ class MainActivity : Activity() {
     }
 
     private fun playItem(item: QueueItem) {
-        if (connection.snapshot.phase != Phase.CONNECTED) return
-        connection.send(Command.PlayItem(item.id)) { status ->
+        val snapshot = connection.snapshot
+        val queueId = snapshot.queueId ?: return
+        if (snapshot.phase != Phase.CONNECTED) return
+        connection.send(Command.PlayItem(queueId, item.id)) { status ->
             if (status == Protocol.ERR_FAILED) Toast.makeText(this, R.string.queue_failed, Toast.LENGTH_SHORT).show()
         }
         queueDialog?.dismiss()

@@ -2,6 +2,7 @@ package com.ender.ninni.protocol
 
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -93,7 +94,7 @@ class ProtocolTest {
             Command.SetVolumeCap(null), Command.StartSleep(1_800, 600), Command.StartSleep(600, 0),
             Command.CancelSleep, Command.Play, Command.Pause, Command.Toggle, Command.Next,
             Command.Previous, Command.Forward, Command.Rewind, Command.VolumeUp, Command.VolumeDown,
-            Command.Ping, Command.PlayItem(4_000_000_001), Command.GetPage(Blob.ART, 0),
+            Command.Ping, Command.PlayItem("0be4d7c3", 4_000_000_001), Command.GetPage(Blob.ART, 0),
             Command.GetPage(Blob.QUEUE, 254),
         )
         for (command in commands) {
@@ -104,7 +105,7 @@ class ProtocolTest {
     @Test
     fun badCommandsAreRejected() {
         for (text in listOf("dance", "seek:-5", "shuffle:2", "repeat:7", "cap:-1", "sleep:0:0", "sleep:60:120", "vol:x",
-            "item:abc", "get:art", "get:art:255", "get:cover:0", "get:queue:-1")) {
+            "item:abc", "item:12", "item:0be4d7c3", "item:0be4d7c:12", "item:0be4d7cg:12", "get:art", "get:art:255", "get:cover:0", "get:queue:-1")) {
             assertNull(text, Protocol.parseCommand(text.toByteArray()))
         }
     }
@@ -144,6 +145,9 @@ class ProtocolTest {
     fun idTextIsEightHexDigits() {
         assertEquals("00000000", Protocol.idText(0))
         assertEquals("ffffffff", Protocol.idText(-1))
+        assertTrue(Protocol.isId(Protocol.idText(0x0be4d7c3)))
+        assertFalse(Protocol.isId("0BE4D7C3"))
+        assertFalse(Protocol.isId("0be4d7c"))
         assertEquals(Protocol.blobId("abc".toByteArray()), Protocol.blobId("abc".toByteArray()))
     }
 

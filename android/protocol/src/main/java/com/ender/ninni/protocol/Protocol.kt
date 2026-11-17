@@ -141,7 +141,11 @@ object Protocol {
             text.startsWith("auth:") -> Command.Auth(arg)
             text.startsWith("vol:") -> arg.toIntOrNull()?.let { Command.SetVolume(it) }
             text.startsWith("seek:") -> arg.toLongOrNull()?.takeIf { it >= 0 }?.let { Command.Seek(it) }
-            text.startsWith("item:") -> arg.toLongOrNull()?.let { Command.PlayItem(it) }
+            text.startsWith("item:") -> {
+                val queue = arg.substringBefore(':')
+                val id = arg.substringAfter(':', "").toLongOrNull()
+                if (isId(queue) && id != null) Command.PlayItem(queue, id) else null
+            }
             text.startsWith("get:") -> {
                 val blob = Blob.fromWire(arg.substringBefore(':'))
                 val page = arg.substringAfter(':', "").toIntOrNull()
@@ -187,6 +191,9 @@ object Protocol {
     }
 
     fun idText(id: Int): String = String.format(Locale.ROOT, "%08x", id)
+
+    /** True for text made by [idText]. */
+    fun isId(text: String): Boolean = text.length == 8 && text.all { it in '0'..'9' || it in 'a'..'f' }
 
     fun pageCount(size: Int): Int = maxOf(1, (size + PAGE_PAYLOAD - 1) / PAGE_PAYLOAD)
 
@@ -320,8 +327,11 @@ sealed interface Command {
     data class Auth(val pin: String) : Command
     data class SetVolume(val level: Int) : Command
     data class Seek(val positionMs: Long) : Command
-    /** Jump to this item of the play queue. */
-    data class PlayItem(val id: Long) : Command
+    /**
+     * Jump to item [id] of the play queue whose id ([Protocol.idText]) is [queue]. Fails when the
+     * queue has changed since: music apps may renumber their items.
+     */
+    data class PlayItem(val queue: String, val id: Long) : Command
     /** Choose the DATA page to read next (handled by the BLE server, not the music app). */
     data class GetPage(val blob: Blob, val page: Int) : Command
     data class SetShuffle(val on: Boolean) : Command
@@ -347,7 +357,7 @@ sealed interface Command {
             is Auth -> "auth:$pin"
             is SetVolume -> "vol:$level"
             is Seek -> "seek:$positionMs"
-            is PlayItem -> "item:$id"
+            is PlayItem -> "item:$queue:$id"
             is GetPage -> "get:${blob.wire}:$page"
             is SetShuffle -> "shuffle:${if (on) 1 else 0}"
             is SetRepeat -> "repeat:${mode.wire}"

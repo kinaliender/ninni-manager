@@ -96,7 +96,7 @@ need `pv` ≥ 3 and their key.
 | `cap:off` | v2 · No volume limit | yes |
 | `sleep:1800:600` | v2 · Pause the music in 1800 s, fading the volume out during the last 600 s | yes |
 | `sleep:off` | v2 · Cancel the sleep timer (the volume stays where it is) | yes |
-| `item:12` | v3 · Play this queue item (id from the queue) | yes |
+| `item:0be4d7c3:12` | v3 · Play item 12 of the queue whose id (`qi`) is `0be4d7c3` | yes |
 | `get:art:0` / `get:queue:0` | v3 · Choose the DATA page to read next (0…254), see below | yes |
 
 Volume changes never show the volume panel or beep on the player. The volume limit also holds
@@ -108,8 +108,10 @@ paused and, ~2 s later and only if it really stopped, the volume goes back to th
 the fade. The player never raises the volume while music is playing.
 
 `seek`, `fwd`/`rew`, `shuffle` and `repeat` return `0x83` when the music app does not support them.
-`item` returns `0x83` when the id is not in the queue. Music apps that cannot jump to a queue
-item get "next" presses instead, which only reaches items after the current one.
+`item` returns `0x83` when the queue has changed since the remote fetched it (`qi` differs) or
+the id is not in it: music apps may renumber their queue items, e.g. Spotify after a jump or
+going back. Fetch the new queue and try again. Music apps that ignore the jump get "next"
+presses instead, which only reach items after the current one.
 Playback commands go to the active media session (Spotify); without notification access they
 are sent as media key events to the last playing app.
 

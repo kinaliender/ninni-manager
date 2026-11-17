@@ -62,6 +62,10 @@ class PlayerConnection(context: Context) {
         val art: Bitmap? = null,
         /** Last fetched play queue; null when the player shares none. */
         val queue: Queue? = null,
+        /** Id of [queue]; it differs from the state's while a changed queue is on its way. */
+        val queueId: String? = null,
+        /** Item of [queue] playing now; null while [queue] is out of date (its ids may be stale). */
+        val queueActive: Long? = null,
     )
 
     private sealed interface Op {
@@ -611,7 +615,9 @@ class PlayerConnection(context: Context) {
         val art = state?.artId?.let { artCache[it] }
         // Keep showing the last queue while a changed one is on its way.
         val queue = if (state?.queueId != null) loadedQueue else null
-        val next = Snapshot(phase, deviceName, state, stateTime, art, queue)
+        val queueId = if (queue != null) loadedQueueId else null
+        val queueActive = state?.queueActive?.takeIf { queueId == state.queueId }
+        val next = Snapshot(phase, deviceName, state, stateTime, art, queue, queueId, queueActive)
         if (next != snapshot) {
             snapshot = next
             listeners.toList().forEach { it(next) }

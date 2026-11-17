@@ -39,8 +39,19 @@ class MediaWatcher(
         const val MAX_STEPS = 30
         const val STEP_DELAY = 400L
         /** Time the music app gets to jump to a queue item before "next" presses take over. */
-        const val JUMP_CHECK_DELAY = 1_500L
+        const val JUMP_CHECK_DELAY = 2_000L
     }
+
+    /** What a track is, for comparing tracks: queue item ids are not stable (see [playItem]). */
+    private data class Track(val title: String?, val artist: String?)
+
+    private fun track(m: MediaMetadata?) =
+        Track(m?.getString(MediaMetadata.METADATA_KEY_TITLE), m?.getString(MediaMetadata.METADATA_KEY_ARTIST))
+
+    private fun track(item: MediaSession.QueueItem) =
+        Track(item.description.title?.toString(), item.description.subtitle?.toString())
+
+    private var jumpCheck: Runnable? = null
 
     data class Info(
         val title: String?,
@@ -198,27 +209,33 @@ class MediaWatcher(
     }
 
     /**
-     * Jumps to a queue item. Apps that do not support that (or say they don't) get "next"
-     * presses instead, which only works forwards.
+     * Jumps to a queue item. Apps that ignore that get "next" presses instead, which only works
+     * forwards. Tracks are compared by title and artist, not by queue id: Spotify renumbers its
+     * queue after a jump, so the track it jumped to may then carry another id.
      */
     fun playItem(id: Long): Boolean {
         val c = controller ?: return false
-        val target = rawQueue.indexOfFirst { it.queueId == id }
-        if (target < 0) return false
-        if (activeQueueId(c) == id) return true
+        val item = rawQueue.firstOrNull { it.queueId == id } ?: return false
+        val target = track(item)
+        val before = track(c.metadata)
+        if (before == target) return true
         c.transportControls.skipToQueueItem(id)
-        handler.postDelayed({
-            if (controller === c && activeQueueId(c) != id) stepTo(c, id)
-        }, JUMP_CHECK_DELAY)
+        jumpCheck?.let(handler::removeCallbacks)
+        jumpCheck = Runnable {
+            jumpCheck = null
+            // Only when the same track is still playing: the app ignored the jump.
+            if (controller === c && track(c.metadata) == before) stepTo(c, target)
+        }.also { handler.postDelayed(it, JUMP_CHECK_DELAY) }
         return true
     }
 
-    private fun stepTo(c: MediaController, id: Long) {
+    /** "Next" presses up to the first queue item after the current one that is [target]. */
+    private fun stepTo(c: MediaController, target: Track) {
         val from = activeQueueId(c)?.let { active -> rawQueue.indexOfFirst { it.queueId == active } } ?: return
-        val to = rawQueue.indexOfFirst { it.queueId == id }
-        val steps = to - from
-        if (from < 0 || steps !in 1..MAX_STEPS) return
-        repeat(steps) { i ->
+        if (from < 0) return
+        val to = (from + 1 until rawQueue.size).firstOrNull { track(rawQueue[it]) == target } ?: return
+        if (to - from > MAX_STEPS) return
+        repeat(to - from) { i ->
             handler.postDelayed({ if (controller === c) c.transportControls.skipToNext() }, i * STEP_DELAY)
         }
     }

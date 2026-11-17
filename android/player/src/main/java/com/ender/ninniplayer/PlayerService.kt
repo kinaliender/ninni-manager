@@ -185,7 +185,10 @@ class PlayerService : Service() {
         writer.println("status=${Status.current.copy(state = null)}")
         writer.println("art=${artwork.bytes?.size ?: 0} bytes")
         val queue = queueSource
-        writer.println("queue=${queue?.items?.size ?: 0} items, ${queueBytes?.size ?: 0} bytes, title=${queue?.title}")
+        writer.println(
+            "queue=${queue?.items?.size ?: 0} items, ${queueBytes?.size ?: 0} bytes, " +
+                "id=${queueId?.let(Protocol::idText)}, title=${queue?.title}",
+        )
         queue?.items?.forEach { writer.println("  ${it.id}  ${it.title}  /  ${it.artist}") }
     }
 
@@ -246,7 +249,10 @@ class PlayerService : Service() {
             Command.Forward -> return media.skip(Protocol.SKIP_SECONDS * 1_000L)
             Command.Rewind -> return media.skip(-Protocol.SKIP_SECONDS * 1_000L)
             is Command.Seek -> return media.seekTo(command.positionMs)
-            is Command.PlayItem -> return media.playItem(command.id)
+            is Command.PlayItem -> {
+                refreshQueue()
+                return command.queue == queueId?.let(Protocol::idText) && media.playItem(command.id)
+            }
             is Command.GetPage -> return false // answered by BleServer
             is Command.SetShuffle -> return media.setShuffle(command.on)
             is Command.SetRepeat -> return media.setRepeat(command.mode)
@@ -303,12 +309,7 @@ class PlayerService : Service() {
     private fun pushState() {
         if (!started) return
         val info = media.info()
-        val queue = media.queue
-        if (queue !== queueSource) {
-            queueSource = queue
-            queueBytes = queue?.let(Protocol::encodeQueue)?.takeIf { it.size <= Protocol.MAX_BLOB }
-            queueId = queueBytes?.let(Protocol::blobId)
-        }
+        refreshQueue()
         val state = PlayerState(
             playing = info.playing ?: audio.isMusicActive,
             title = info.title,
@@ -334,6 +335,15 @@ class PlayerService : Service() {
         lastState = state
         ble.publish(state)
         Status.update { it.copy(state = state) }
+    }
+
+    /** Re-encodes the queue if the music app has changed it. */
+    private fun refreshQueue() {
+        val queue = media.queue
+        if (queue === queueSource) return
+        queueSource = queue
+        queueBytes = queue?.let(Protocol::encodeQueue)?.takeIf { it.size <= Protocol.MAX_BLOB }
+        queueId = queueBytes?.let(Protocol::blobId)
     }
 
     private fun readBattery(intent: Intent) {
