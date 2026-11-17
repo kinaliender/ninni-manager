@@ -20,12 +20,16 @@ import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.ImageButton
+import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.ListView
 import android.widget.SeekBar
 import android.widget.TextView
+import android.widget.Toast
 import com.ender.ninni.protocol.Command
 import com.ender.ninni.protocol.PlayerState
 import com.ender.ninni.protocol.Protocol
+import com.ender.ninni.protocol.QueueItem
 import com.ender.ninni.protocol.RepeatMode
 import com.ender.ninnimanager.PlayerConnection.Phase
 import java.util.Locale
@@ -44,6 +48,8 @@ class MainActivity : Activity() {
     private val handler = Handler(Looper.getMainLooper())
 
     private lateinit var status: TextView
+    private lateinit var queueButton: Button
+    private lateinit var cover: ImageView
     private lateinit var title: TextView
     private lateinit var artist: TextView
     private lateinit var progressGroup: View
@@ -78,6 +84,8 @@ class MainActivity : Activity() {
     private lateinit var controls: List<View>
 
     private var pinDialog: AlertDialog? = null
+    private var queueDialog: AlertDialog? = null
+    private var queueAdapter: QueueAdapter? = null
     private var draggingVolume = false
     private var draggingPosition = false
     private val listener: (PlayerConnection.Snapshot) -> Unit = { render(it) }
@@ -101,6 +109,9 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         status = findViewById(R.id.status)
+        queueButton = findViewById(R.id.queueButton)
+        cover = findViewById(R.id.cover)
+        cover.clipToOutline = true // rounded corners from the background (the XML attribute is API 31+)
         title = findViewById(R.id.title)
         artist = findViewById(R.id.artist)
         progressGroup = findViewById(R.id.progressGroup)
@@ -139,6 +150,7 @@ class MainActivity : Activity() {
             sleepFade, sleepCancel,
         ) + sleepChoices
 
+        queueButton.setOnClickListener { showQueue() }
         prev.setOnClickListener { connection.send(Command.Previous) }
         toggle.setOnClickListener { connection.send(Command.Toggle) }
         next.setOnClickListener { connection.send(Command.Next) }
@@ -303,6 +315,7 @@ class MainActivity : Activity() {
         artist.visibility = if (state?.artist == null) View.GONE else View.VISIBLE
         toggle.setImageResource(if (state?.playing == true) R.drawable.ic_pause else R.drawable.ic_play)
         toggle.contentDescription = getString(if (state?.playing == true) R.string.pause else R.string.play)
+        renderCover(snapshot)
         renderProgress(state)
 
         if (state != null) {
@@ -331,6 +344,55 @@ class MainActivity : Activity() {
             Phase.WRONG_PIN -> showPinDialog(wrong = true)
             else -> Unit
         }
+    }
+
+    /**
+     * The cover box stays (empty) while a cover is loading, so the layout does not jump; the
+     * playlist button shows once a queue has arrived.
+     */
+    private fun renderCover(snapshot: PlayerConnection.Snapshot) {
+        val state = snapshot.state
+        cover.visibility = if (state?.artId != null) View.VISIBLE else View.GONE
+        cover.setImageBitmap(snapshot.art)
+        queueButton.visibility = if (snapshot.queue != null) View.VISIBLE else View.GONE
+        if (snapshot.queue == null) {
+            queueDialog?.dismiss()
+        } else {
+            queueAdapter?.show(snapshot.queue, state?.queueActive)
+            queueDialog?.setTitle(snapshot.queue.title ?: getString(R.string.queue))
+        }
+    }
+
+    private fun showQueue() {
+        if (queueDialog?.isShowing == true || isFinishing) return
+        val snapshot = connection.snapshot
+        val queue = snapshot.queue ?: return
+        val adapter = QueueAdapter(this).apply { show(queue, snapshot.state?.queueActive) }
+        val list = ListView(this).apply {
+            this.adapter = adapter
+            divider = null
+            setOnItemClickListener { _, _, position, _ -> playItem(adapter.getItem(position)) }
+        }
+        queueAdapter = adapter
+        queueDialog = AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
+            .setTitle(queue.title ?: getString(R.string.queue))
+            .setView(list)
+            .setNegativeButton(R.string.close, null)
+            .setOnDismissListener {
+                queueDialog = null
+                queueAdapter = null
+            }
+            .show()
+        // Open with the track playing now in view, one row of context above it.
+        adapter.activePosition().takeIf { it > 0 }?.let { list.setSelection(it - 1) }
+    }
+
+    private fun playItem(item: QueueItem) {
+        if (connection.snapshot.phase != Phase.CONNECTED) return
+        connection.send(Command.PlayItem(item.id)) { status ->
+            if (status == Protocol.ERR_FAILED) Toast.makeText(this, R.string.queue_failed, Toast.LENGTH_SHORT).show()
+        }
+        queueDialog?.dismiss()
     }
 
     /** Progress bar, shuffle, ±15 s and repeat; each only when the music app supports it. */

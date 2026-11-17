@@ -1,5 +1,6 @@
 package com.ender.ninni.protocol
 
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -21,6 +22,9 @@ class ProtocolTest {
         repeat = RepeatMode.ALL,
         volumeCap = 9,
         sleep = Sleep(remainingSeconds = 1_799, fadeSeconds = 600),
+        artId = "0a1b2c3d",
+        queueId = "ffeeddcc",
+        queueActive = 4_000_000_001,
     )
 
     @Test
@@ -34,6 +38,7 @@ class ProtocolTest {
     fun optionalFieldsStayNull() {
         val bare = state.copy(
             duration = null, position = null, shuffle = null, repeat = null, volumeCap = null, sleep = null,
+            artId = null, queueId = null, queueActive = null,
         )
         assertEquals(bare, Protocol.decodeState(Protocol.encodeState(bare))!!.state)
     }
@@ -88,7 +93,8 @@ class ProtocolTest {
             Command.SetVolumeCap(null), Command.StartSleep(1_800, 600), Command.StartSleep(600, 0),
             Command.CancelSleep, Command.Play, Command.Pause, Command.Toggle, Command.Next,
             Command.Previous, Command.Forward, Command.Rewind, Command.VolumeUp, Command.VolumeDown,
-            Command.Ping,
+            Command.Ping, Command.PlayItem(4_000_000_001), Command.GetPage(Blob.ART, 0),
+            Command.GetPage(Blob.QUEUE, 254),
         )
         for (command in commands) {
             assertEquals(command, Protocol.parseCommand(command.wire.toByteArray()))
@@ -97,7 +103,8 @@ class ProtocolTest {
 
     @Test
     fun badCommandsAreRejected() {
-        for (text in listOf("dance", "seek:-5", "shuffle:2", "repeat:7", "cap:-1", "sleep:0:0", "sleep:60:120", "vol:x")) {
+        for (text in listOf("dance", "seek:-5", "shuffle:2", "repeat:7", "cap:-1", "sleep:0:0", "sleep:60:120", "vol:x",
+            "item:abc", "get:art", "get:art:255", "get:cover:0", "get:queue:-1")) {
             assertNull(text, Protocol.parseCommand(text.toByteArray()))
         }
     }
@@ -107,5 +114,59 @@ class ProtocolTest {
         assertEquals(RepeatMode.ALL, RepeatMode.OFF.next)
         assertEquals(RepeatMode.ONE, RepeatMode.ALL.next)
         assertEquals(RepeatMode.OFF, RepeatMode.ONE.next)
+    }
+
+    @Test
+    fun blobsRoundTripThroughPages() {
+        for (size in listOf(0, 1, Protocol.PAGE_PAYLOAD, Protocol.PAGE_PAYLOAD + 1, 6_000, Protocol.MAX_BLOB)) {
+            val bytes = ByteArray(size) { (it * 31 + 7).toByte() }
+            val id = Protocol.blobId(bytes)
+            val count = Protocol.pageCount(size)
+            val pages = (0 until count).map { Protocol.decodePage(Protocol.page(Blob.ART, id, bytes, it)!!)!! }
+            pages.forEachIndexed { index, page ->
+                assertEquals(Blob.ART, page.blob)
+                assertEquals(index, page.index)
+                assertEquals(count, page.count)
+                assertEquals(id, page.id)
+                assertTrue(page.payload.size + Protocol.PAGE_HEADER <= 500)
+            }
+            assertArrayEquals(bytes, pages.fold(ByteArray(0)) { all, page -> all + page.payload })
+            assertNull(Protocol.page(Blob.ART, id, bytes, count))
+        }
+    }
+
+    @Test
+    fun tooBigBlobHasNoPages() {
+        assertNull(Protocol.page(Blob.ART, 1, ByteArray(Protocol.MAX_BLOB + 1), 0))
+    }
+
+    @Test
+    fun idTextIsEightHexDigits() {
+        assertEquals("00000000", Protocol.idText(0))
+        assertEquals("ffffffff", Protocol.idText(-1))
+        assertEquals(Protocol.blobId("abc".toByteArray()), Protocol.blobId("abc".toByteArray()))
+    }
+
+    @Test
+    fun queueRoundTrips() {
+        val queue = Queue(
+            "Ninniler",
+            listOf(QueueItem(0, "Dandini dandini dastana", "Anonim"), QueueItem(4_000_000_001, "Brahms Lullaby", null)),
+        )
+        assertEquals(queue, Protocol.decodeQueue(Protocol.encodeQueue(queue)))
+        val untitled = Queue(null, emptyList())
+        assertEquals(untitled, Protocol.decodeQueue(Protocol.encodeQueue(untitled)))
+        assertNull(Protocol.decodeQueue("[]".toByteArray()))
+    }
+
+    @Test
+    fun queueIsLimited() {
+        val long = "ç".repeat(500)
+        val queue = Queue(long, List(300) { QueueItem(it.toLong(), long, long) })
+        val decoded = Protocol.decodeQueue(Protocol.encodeQueue(queue))!!
+        assertEquals(Protocol.MAX_QUEUE_ITEMS, decoded.items.size)
+        assertEquals(80, decoded.title!!.length)
+        assertEquals(80, decoded.items[0].title.length)
+        assertTrue(Protocol.encodeQueue(queue).size <= Protocol.MAX_BLOB)
     }
 }

@@ -1,5 +1,6 @@
 package com.ender.ninniplayer
 
+import com.ender.ninni.protocol.Blob
 import com.ender.ninni.protocol.Command
 import com.ender.ninni.protocol.PlayerState
 import com.ender.ninni.protocol.Protocol
@@ -25,16 +26,21 @@ import android.os.ParcelUuid
 import android.os.SystemClock
 
 /**
- * BLE peripheral: advertises [Protocol.SERVICE] and runs a GATT server with the STATE and
- * COMMAND characteristics. Every callback is moved onto [handler] (main thread), so the
- * fields below are only touched from one thread.
+ * BLE peripheral: advertises [Protocol.SERVICE] and runs a GATT server with the STATE,
+ * COMMAND and DATA characteristics. Every callback is moved onto [handler] (main thread), so
+ * the fields below are only touched from one thread.
  */
 @SuppressLint("MissingPermission") // PlayerService starts this only after Bluetooth permissions are granted.
 class BleServer(
     private val context: Context,
     private val handler: Handler,
     private val execute: (Command) -> Int,
+    /** Current cover art / queue bytes for DATA; null when there is none. */
+    private val content: (Blob) -> ByteArray?,
 ) {
+    /** What a manager reads from DATA: one page of a copy taken when it asked for page 0. */
+    private class Selection(val blob: Blob, val id: Int, val bytes: ByteArray, var page: Int)
+
     private val manager = context.getSystemService(BluetoothManager::class.java)
     private var server: BluetoothGattServer? = null
     private var advertiser: BluetoothLeAdvertiser? = null
@@ -54,6 +60,7 @@ class BleServer(
     private val pending = mutableSetOf<BluetoothDevice>()
     /** Value being read with offsets (long read), so all parts come from the same state. */
     private val readSnapshot = mutableMapOf<BluetoothDevice, ByteArray>()
+    private val selection = mutableMapOf<BluetoothDevice, Selection>()
 
     private val restartAdvertising = Runnable { startAdvertising() }
     private val flushPending = Runnable { pending.toList().forEach { notify(it) } }
@@ -90,9 +97,15 @@ class BleServer(
             BluetoothGattCharacteristic.PROPERTY_WRITE,
             BluetoothGattCharacteristic.PERMISSION_WRITE,
         )
+        val dataC = BluetoothGattCharacteristic(
+            Protocol.DATA,
+            BluetoothGattCharacteristic.PROPERTY_READ,
+            BluetoothGattCharacteristic.PERMISSION_READ,
+        )
         val service = BluetoothGattService(Protocol.SERVICE, BluetoothGattService.SERVICE_TYPE_PRIMARY).apply {
             addCharacteristic(stateC)
             addCharacteristic(commandC)
+            addCharacteristic(dataC)
         }
         server = gatt
         advertiser = adv
@@ -123,6 +136,7 @@ class BleServer(
         sendingSince.clear()
         pending.clear()
         readSnapshot.clear()
+        selection.clear()
         publishCounts()
     }
 
@@ -249,14 +263,18 @@ class BleServer(
         ) {
             handler.post {
                 val s = server ?: return@post
-                if (characteristic.uuid != Protocol.STATE) {
-                    s.sendResponse(device, requestId, BluetoothGatt.GATT_READ_NOT_PERMITTED, offset, null)
-                    return@post
-                }
-                val full = if (offset == 0) {
-                    fullState().also { readSnapshot[device] = it }
-                } else {
-                    readSnapshot[device] ?: fullState()
+                val full = when (characteristic.uuid) {
+                    Protocol.STATE -> if (offset == 0) {
+                        fullState().also { readSnapshot[device] = it }
+                    } else {
+                        readSnapshot[device] ?: fullState()
+                    }
+                    // Stays the same until the next get: command, so offsets always match.
+                    Protocol.DATA -> selection[device]?.let { Protocol.page(it.blob, it.id, it.bytes, it.page) } ?: ByteArray(0)
+                    else -> {
+                        s.sendResponse(device, requestId, BluetoothGatt.GATT_READ_NOT_PERMITTED, offset, null)
+                        return@post
+                    }
                 }
                 if (offset > full.size) {
                     s.sendResponse(device, requestId, BluetoothGatt.GATT_INVALID_OFFSET, offset, null)
@@ -331,8 +349,29 @@ class BleServer(
         return when (command) {
             is Command.Auth -> authorize(device, command.pin)
             Command.Ping -> BluetoothGatt.GATT_SUCCESS
-            else -> if (device in authorized) execute(command) else Protocol.ERR_NOT_AUTHORIZED
+            else -> when {
+                device !in authorized -> Protocol.ERR_NOT_AUTHORIZED
+                command is Command.GetPage -> select(device, command)
+                else -> execute(command)
+            }
         }
+    }
+
+    /** Page 0 takes a fresh copy of the content, so all pages of one transfer belong together. */
+    private fun select(device: BluetoothDevice, command: Command.GetPage): Int {
+        var current = selection[device]
+        if (command.page == 0 || current == null || current.blob != command.blob) {
+            val bytes = content(command.blob)
+            if (bytes == null || bytes.size > Protocol.MAX_BLOB) {
+                selection -= device
+                return Protocol.ERR_FAILED
+            }
+            current = Selection(command.blob, Protocol.blobId(bytes), bytes, 0)
+            selection[device] = current
+        }
+        if (command.page >= Protocol.pageCount(current.bytes.size)) return Protocol.ERR_FAILED
+        current.page = command.page
+        return BluetoothGatt.GATT_SUCCESS
     }
 
     private fun authorize(device: BluetoothDevice, pin: String): Int {
@@ -400,6 +439,7 @@ class BleServer(
         sendingSince -= device
         pending -= device
         readSnapshot -= device
+        selection -= device
     }
 
     private fun publishCounts() {

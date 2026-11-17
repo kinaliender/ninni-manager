@@ -9,7 +9,8 @@ Uyuyan çocuğun yanında eski bir Android telefon durur ve Spotify'dan ninni ç
 **Ninni Çalar** çalışır. Ebeveynlerin telefonlarındaki **Ninni Kumanda** onu yan odadan
 kontrol eder. Wi-Fi, internet, hesap ya da sunucu gerekmez.
 
-- Çalan şarkıyı, ilerlemesini ve çalar telefonun pilini görün
+- Çalan şarkıyı kapağıyla, ilerlemesini ve çalar telefonun pilini görün
+- Çalma listesini görün, bir parçaya dokunup onu çalın
 - Sesi değiştirin (kumandanın kendi ses tuşları da çalışır), durdurun/başlatın, önceki/sonraki şarkıya geçin
 - Şarkının istediğiniz yerine atlayın, 15 sn geri ya da ileri gidin, karıştır ve tekrarla'yı açıp kapatın
 - **Ses sınırı:** müzik sınırın üstüne çıkmaz, telefonun kendi ses tuşlarıyla bile
@@ -64,10 +65,11 @@ gerekir (BLE taraması için bir Android kuralı); Android 12+'da gerekmez.
 | Çalar ekranı | `android/player/.../MainActivity.kt` | Eşleşme kodu, başlat/durdur, çalan şarkı, kurulum listesi. Bilerek karanlık |
 | Çalar hizmeti | `android/player/.../PlayerService.kt` | Ön plan hizmeti: durumu toplar, komutları uygular, ekran kapanınca da çalışır, yeniden başlatma ya da güncellemeden sonra kendini açar (`BootReceiver.kt`) |
 | Çalar Bluetooth | `android/player/.../BleServer.kt` | Yayın + GATT sunucusu, bağlantı başına kod kontrolü, bildirim kuyruğu, uzun okumalar |
-| Çalar medya | `android/player/.../MediaWatcher.kt`, `MediaListenerService.kt` | Müzik uygulamasının medya oturumunu izler: şarkı adı, konum, sarma, karıştır/tekrarla; olmazsa medya tuşlarını kullanır |
+| Çalar medya | `android/player/.../MediaWatcher.kt`, `MediaListenerService.kt` | Müzik uygulamasının medya oturumunu izler: şarkı adı, konum, sarma, karıştır/tekrarla, çalma sırası; olmazsa medya tuşlarını kullanır |
+| Kapak | `android/player/.../Artwork.kt` | Şarkının kapağını kumandaların parça parça çektiği küçük bir JPEG'e çevirir |
 | Uyku zamanlayıcısı | `android/player/.../SleepTimer.kt` | Sesi adım adım kısar, durdurur, müzik durduktan sonra sesi eski haline getirir |
-| Kumanda ekranı | `android/manager/.../MainActivity.kt` | Büyük düğmeler, ilerleme, ses ve sınır, uyku zamanlayıcısı, pil; uygulama açıkken telefonun ses tuşları çaları kontrol eder |
-| Kumanda Bluetooth | `android/manager/.../PlayerConnection.kt` | Servis UUID'siyle tarama, GATT işlem kuyruğu, eşleşme kodu, bekleyerek yeniden bağlanma |
+| Kumanda ekranı | `android/manager/.../MainActivity.kt`, `QueueAdapter.kt` | Büyük düğmeler, kapak, ilerleme, çalma listesi, ses ve sınır, uyku zamanlayıcısı, pil; uygulama açıkken telefonun ses tuşları çaları kontrol eder |
+| Kumanda Bluetooth | `android/manager/.../PlayerConnection.kt` | Servis UUID'siyle tarama, GATT işlem kuyruğu, eşleşme kodu, bekleyerek yeniden bağlanma, kapak ve çalma listesini çekme |
 
 Üçüncü taraf kütüphane yok: sadece `androidx.core`, çalarda karıştır/tekrarla için ayrıca
 `androidx.media`.

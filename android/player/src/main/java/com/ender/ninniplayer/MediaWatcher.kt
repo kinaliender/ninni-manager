@@ -5,6 +5,7 @@ import android.content.Context
 import android.media.AudioManager
 import android.media.MediaMetadata
 import android.media.session.MediaController
+import android.media.session.MediaSession
 import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
 import android.os.Handler
@@ -14,6 +15,8 @@ import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
 import android.view.KeyEvent
 import androidx.core.app.NotificationManagerCompat
+import com.ender.ninni.protocol.Queue
+import com.ender.ninni.protocol.QueueItem
 import com.ender.ninni.protocol.RepeatMode
 
 /**
@@ -28,7 +31,17 @@ class MediaWatcher(
     private val context: Context,
     private val handler: Handler,
     private val onChange: () -> Unit,
+    /** The followed track's metadata changed (cover art); null when no session is followed. */
+    private val onMetadata: (MediaMetadata?) -> Unit,
 ) {
+    private companion object {
+        /** Most "next" presses used to reach a queue item when the app cannot jump to it. */
+        const val MAX_STEPS = 30
+        const val STEP_DELAY = 400L
+        /** Time the music app gets to jump to a queue item before "next" presses take over. */
+        const val JUMP_CHECK_DELAY = 1_500L
+    }
+
     data class Info(
         val title: String?,
         val artist: String?,
@@ -37,6 +50,8 @@ class MediaWatcher(
         val position: Long? = null,
         val shuffle: Boolean? = null,
         val repeat: RepeatMode? = null,
+        /** [QueueItem.id] of the track playing now. */
+        val queueActive: Long? = null,
     )
 
     private val sessions = context.getSystemService(MediaSessionManager::class.java)
@@ -45,6 +60,11 @@ class MediaWatcher(
     private var controller: MediaController? = null
     private var compat: MediaControllerCompat? = null
     private var listening = false
+    private var rawQueue: List<MediaSession.QueueItem> = emptyList()
+
+    /** The music app's play queue; null when it shares none. Rebuilt only when it changes. */
+    var queue: Queue? = null
+        private set
 
     val hasAccess: Boolean
         get() = NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName)
@@ -59,7 +79,20 @@ class MediaWatcher(
             onChange()
         }
 
-        override fun onMetadataChanged(metadata: MediaMetadata?) = onChange()
+        override fun onMetadataChanged(metadata: MediaMetadata?) {
+            onMetadata(metadata)
+            onChange()
+        }
+
+        override fun onQueueChanged(queue: MutableList<MediaSession.QueueItem>?) {
+            setQueue(queue, controller?.queueTitle)
+            onChange()
+        }
+
+        override fun onQueueTitleChanged(title: CharSequence?) {
+            setQueue(controller?.queue, title)
+            onChange()
+        }
 
         override fun onSessionDestroyed() = refresh()
     }
@@ -123,7 +156,7 @@ class MediaWatcher(
             PlaybackStateCompat.REPEAT_MODE_ALL, PlaybackStateCompat.REPEAT_MODE_GROUP -> RepeatMode.ALL
             else -> null
         }
-        return Info(title, artist, state?.state?.let(::isPlaying), duration, position, shuffle, repeat)
+        return Info(title, artist, state?.state?.let(::isPlaying), duration, position, shuffle, repeat, activeQueueId(c))
     }
 
     fun play() {
@@ -162,6 +195,32 @@ class MediaWatcher(
     fun skip(deltaMs: Long): Boolean {
         val position = info().position ?: return false
         return seekTo(position + deltaMs)
+    }
+
+    /**
+     * Jumps to a queue item. Apps that do not support that (or say they don't) get "next"
+     * presses instead, which only works forwards.
+     */
+    fun playItem(id: Long): Boolean {
+        val c = controller ?: return false
+        val target = rawQueue.indexOfFirst { it.queueId == id }
+        if (target < 0) return false
+        if (activeQueueId(c) == id) return true
+        c.transportControls.skipToQueueItem(id)
+        handler.postDelayed({
+            if (controller === c && activeQueueId(c) != id) stepTo(c, id)
+        }, JUMP_CHECK_DELAY)
+        return true
+    }
+
+    private fun stepTo(c: MediaController, id: Long) {
+        val from = activeQueueId(c)?.let { active -> rawQueue.indexOfFirst { it.queueId == active } } ?: return
+        val to = rawQueue.indexOfFirst { it.queueId == id }
+        val steps = to - from
+        if (from < 0 || steps !in 1..MAX_STEPS) return
+        repeat(steps) { i ->
+            handler.postDelayed({ if (controller === c) c.transportControls.skipToNext() }, i * STEP_DELAY)
+        }
     }
 
     fun setShuffle(on: Boolean): Boolean {
@@ -206,7 +265,31 @@ class MediaWatcher(
         }
         next?.registerCallback(controllerCallback, handler)
         compat?.registerCallback(compatCallback, handler)
+        setQueue(next?.queue, next?.queueTitle)
+        onMetadata(next?.metadata)
         onChange()
+    }
+
+    private fun setQueue(list: List<MediaSession.QueueItem>?, title: CharSequence?) {
+        rawQueue = list.orEmpty()
+        val items = rawQueue.map { item ->
+            val d = item.description
+            QueueItem(item.queueId, d.title?.toString().orEmpty(), d.subtitle?.toString()?.ifEmpty { null })
+        }
+        val next = if (items.isEmpty()) null else Queue(title?.toString()?.ifEmpty { null }, items)
+        if (next != queue) queue = next
+    }
+
+    /**
+     * The queue item playing now: the app's own answer, or else the first item with the
+     * current title (some apps never set the active item).
+     */
+    private fun activeQueueId(c: MediaController): Long? {
+        if (rawQueue.isEmpty()) return null
+        val active = c.playbackState?.activeQueueItemId ?: MediaSession.QueueItem.UNKNOWN_ID.toLong()
+        if (active != MediaSession.QueueItem.UNKNOWN_ID.toLong() && rawQueue.any { it.queueId == active }) return active
+        val title = c.metadata?.getString(MediaMetadata.METADATA_KEY_TITLE) ?: return null
+        return rawQueue.firstOrNull { it.description.title?.toString() == title }?.queueId
     }
 
     /** Position now: the session reports it at its last update, so add the time played since. */

@@ -53,4 +53,8 @@
     <string name="pause">Pause</string>
     <string name="volume_down">Volume down</string>
     <string name="volume_up">Volume up</string>
+    <string name="cover">Cover</string>
+    <string name="queue">Playlist</string>
+    <string name="queue_failed">Couldn\'t jump to that track</string>
+    <string name="close">Close</string>
 </resources>

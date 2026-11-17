@@ -1,4 +1,4 @@
-# Ninni BLE protocol (v2)
+# Ninni BLE protocol (v3)
 
 The **player** (old Android phone next to the baby) is a BLE peripheral running a GATT server.
 The **manager** (the remote on a parent's phone) is a BLE central. Wi-Fi is not needed.
@@ -14,6 +14,7 @@ platform must follow the same rules.
 | Service | `8641a100-acc1-4dba-9086-98a6e53c4f74` | advertised (primary) |
 | STATE | `8641a101-acc1-4dba-9086-98a6e53c4f74` | read, notify |
 | COMMAND | `8641a102-acc1-4dba-9086-98a6e53c4f74` | write **with response** |
+| DATA | `8641a103-acc1-4dba-9086-98a6e53c4f74` | read · v3 |
 
 The player advertises the service UUID; the scan response carries the phone's Bluetooth name
 (dropped if the name is too long). Advertising restarts after every connect/disconnect, so
@@ -39,13 +40,14 @@ safety net.
 ## STATE (UTF-8 JSON)
 
 ```json
-{"pv":2,"p":1,"t":"Brahms Lullaby","a":"Baby Sleep","v":4,"m":15,"b":82,"c":1,"n":1,
- "d":215000,"o":61250,"sh":0,"rp":2,"vc":9,"sr":1799,"sf":600}
+{"pv":3,"p":1,"t":"Brahms Lullaby","a":"Baby Sleep","v":4,"m":15,"b":82,"c":1,"n":1,
+ "d":215000,"o":61250,"sh":0,"rp":2,"vc":9,"sr":1799,"sf":600,
+ "ar":"5f0c2a91","qi":"0be4d7c3","qa":12}
 ```
 
 | Key | Meaning |
 |---|---|
-| `pv` | Protocol version (2; a v1 player sends 1 and none of the keys marked v2) |
+| `pv` | Protocol version (3; older players send 1 or 2 and none of the keys marked with a higher version) |
 | `p` | 1 = playing, 0 = paused/stopped |
 | `t` | Track title (missing when unknown) |
 | `a` | Artist (missing when unknown) |
@@ -61,6 +63,9 @@ safety net.
 | `vc` | v2 · Volume limit: highest step allowed (missing = no limit) |
 | `sr` | v2 · Sleep timer: seconds until the music pauses (missing = timer off). The manager counts down by itself |
 | `sf` | v2 · Sleep timer: the volume fades out during the last `sf` seconds (0 = no fade) |
+| `ar` | v3 · Id of the current cover art on DATA, 8 hex digits (missing = no cover) |
+| `qi` | v3 · Id of the play queue on DATA (missing = the music app shares no queue) |
+| `qa` | v3 · Queue item id of the track playing now (missing = unknown) |
 | `x` | 1 = this notification was shortened to fit the MTU: **read STATE for the full value** |
 
 Notifications are limited to MTU − 3 bytes. When the state does not fit, title/artist are
@@ -70,7 +75,8 @@ The player notifies ~120 ms after any change (track, play/pause, volume, battery
 5 s while something counts (playing → `o`, sleep timer → `sr`).
 
 A manager shows the volume limit and the sleep timer only when `pv` ≥ 2, and each of the
-progress bar, ±15 s, shuffle and repeat only when its key is present.
+progress bar, ±15 s, shuffle and repeat only when its key is present. Cover art and the queue
+need `pv` ≥ 3 and their key.
 
 ## COMMAND (UTF-8 text, case-insensitive)
 
@@ -90,6 +96,8 @@ progress bar, ±15 s, shuffle and repeat only when its key is present.
 | `cap:off` | v2 · No volume limit | yes |
 | `sleep:1800:600` | v2 · Pause the music in 1800 s, fading the volume out during the last 600 s | yes |
 | `sleep:off` | v2 · Cancel the sleep timer (the volume stays where it is) | yes |
+| `item:12` | v3 · Play this queue item (id from the queue) | yes |
+| `get:art:0` / `get:queue:0` | v3 · Choose the DATA page to read next (0…254), see below | yes |
 
 Volume changes never show the volume panel or beep on the player. The volume limit also holds
 for the player phone's own volume keys.
@@ -100,8 +108,39 @@ paused and, ~2 s later and only if it really stopped, the volume goes back to th
 the fade. The player never raises the volume while music is playing.
 
 `seek`, `fwd`/`rew`, `shuffle` and `repeat` return `0x83` when the music app does not support them.
+`item` returns `0x83` when the id is not in the queue. Music apps that cannot jump to a queue
+item get "next" presses instead, which only reaches items after the current one.
 Playback commands go to the active media session (Spotify); without notification access they
 are sent as media key events to the last playing app.
+
+## DATA: cover art and queue (v3)
+
+Bigger content is read page by page, because one attribute value is at most 512 bytes:
+
+1. Write `get:art:0` (or `get:queue:0`) to COMMAND. Page 0 makes the player take a copy of the
+   current content for this connection, so all pages of one transfer belong together.
+   `0x83` = nothing to send.
+2. Read DATA. The value is one page:
+
+   | Bytes | Meaning |
+   |---|---|
+   | 0 | Content: 1 = cover art, 2 = queue |
+   | 1 | Page index |
+   | 2 | Page count (1…255) |
+   | 3–6 | Content id, big-endian (the same number as `ar` / `qi`) |
+   | 7… | Up to 493 bytes of content |
+
+3. Write `get:art:1`, read DATA, and so on until the last page. Join the payloads.
+
+The id is the CRC-32 of the whole content, so the manager can check what it joined and keep
+covers it has already seen (a playlist on repeat needs each cover only once). If the content
+changed between the state and the transfer, the pages carry the new id; keep the content under
+that id.
+
+- **Cover art**: a JPEG, 160 × 160 (the centre square of the music app's cover), a few kB.
+- **Queue**: UTF-8 JSON, `{"t":"Ninniler","i":[[12,"Dandini dandini","Anonim"],[13,"Brahms Lullaby"]]}`:
+  `t` is the queue title (may be missing), each item is `[id, title, artist]` (artist may be
+  missing). At most 100 items; texts are cut at 80 characters.
 
 ## Write responses
 

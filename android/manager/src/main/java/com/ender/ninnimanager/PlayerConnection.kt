@@ -18,20 +18,30 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.ParcelUuid
 import android.os.SystemClock
 import androidx.core.content.ContextCompat
+import com.ender.ninni.protocol.Blob
 import com.ender.ninni.protocol.Command
 import com.ender.ninni.protocol.PlayerState
 import com.ender.ninni.protocol.Protocol
+import com.ender.ninni.protocol.Queue
+import java.io.ByteArrayOutputStream
+import java.util.UUID
 
 /**
  * BLE central for the player: scan by service UUID, connect, subscribe, authorize with the
  * PIN, send commands, reconnect with backoff. Android allows one GATT operation at a time,
  * so every operation goes through [queue]. All state lives on the main thread.
+ *
+ * The cover art and the play queue are fetched from DATA page by page whenever the state
+ * announces a new id (protocol v3); covers are kept in memory, so a repeating playlist does
+ * not fetch them again.
  *
  * The player's Bluetooth address rotates (LE privacy), so it is found by scanning every time
  * instead of by a saved address.
@@ -48,6 +58,10 @@ class PlayerConnection(context: Context) {
         val state: PlayerState? = null,
         /** elapsedRealtime when [state] arrived; position and sleep timer count on from here. */
         val stateTime: Long = 0,
+        /** Cover of the current track once fetched; null while loading or when there is none. */
+        val art: Bitmap? = null,
+        /** Last fetched play queue; null when the player shares none. */
+        val queue: Queue? = null,
     )
 
     private sealed interface Op {
@@ -56,6 +70,15 @@ class PlayerConnection(context: Context) {
         data object Subscribe : Op
         data object Read : Op
         class Write(val text: String, val onResult: (Int) -> Unit) : Op
+        /** Reads DATA; null on failure. */
+        class ReadData(val onResult: (ByteArray?) -> Unit) : Op
+    }
+
+    /** A cover or queue being fetched page by page. */
+    private class Transfer(val blob: Blob) {
+        val bytes = ByteArrayOutputStream()
+        var count = 0
+        var id = 0
     }
 
     private companion object {
@@ -66,6 +89,7 @@ class PlayerConnection(context: Context) {
         const val STOP_DELAY = 30_000L
         const val MAX_QUEUED_COMMANDS = 5
         const val POLL_INTERVAL = 15_000L
+        const val ART_CACHE = 40
     }
 
     private val context = context.applicationContext
@@ -79,9 +103,19 @@ class PlayerConnection(context: Context) {
     private var gatt: BluetoothGatt? = null
     private var stateChar: BluetoothGattCharacteristic? = null
     private var commandChar: BluetoothGattCharacteristic? = null
+    private var dataChar: BluetoothGattCharacteristic? = null
     private var authorized = false
     private val queue = ArrayDeque<Op>()
     private var current: Op? = null
+
+    private var transfer: Transfer? = null
+    /** Id last asked for per blob on this connection, so a failing one is not fetched in a loop. */
+    private val tried = mutableMapOf<Blob, String>()
+    private val artCache = object : LinkedHashMap<String, Bitmap>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Bitmap>) = size > ART_CACHE
+    }
+    private var loadedQueue: Queue? = null
+    private var loadedQueueId: String? = null
 
     var snapshot = Snapshot()
         private set
@@ -159,15 +193,19 @@ class PlayerConnection(context: Context) {
         if (gatt != null && commandChar != null) authenticate() else connectNow()
     }
 
-    fun send(command: Command) {
-        if (!authorized) return
+    /** [onResult] gets the player's answer (e.g. [Protocol.ERR_FAILED]) or -1 when not sent. */
+    fun send(command: Command, onResult: ((Int) -> Unit)? = null) {
         // Holding a volume key repeats fast; don't build up a long backlog.
-        if (queue.count { it is Op.Write } >= MAX_QUEUED_COMMANDS) return
+        if (!authorized || queue.count { it is Op.Write } >= MAX_QUEUED_COMMANDS) {
+            onResult?.invoke(-1)
+            return
+        }
         enqueue(Op.Write(command.wire) { status ->
             if (status == Protocol.ERR_NOT_AUTHORIZED) {
                 authorized = false
                 authenticate()
             }
+            onResult?.invoke(status)
         })
     }
 
@@ -257,18 +295,27 @@ class PlayerConnection(context: Context) {
         handler.removeCallbacks(connectTimeout)
         handler.removeCallbacks(opTimeout)
         handler.removeCallbacks(pollRunnable)
-        val dropped = (listOfNotNull(current) + queue).filterIsInstance<Op.Write>()
+        val dropped = listOfNotNull(current) + queue
         queue.clear()
         current = null
         authorized = false
+        transfer = null
+        tried.clear()
         stateChar = null
         commandChar = null
+        dataChar = null
         gatt?.let {
             runCatching { it.disconnect() }
             runCatching { it.close() }
         }
         gatt = null
-        dropped.forEach { it.onResult(-1) }
+        dropped.forEach { op ->
+            when (op) {
+                is Op.Write -> op.onResult(-1)
+                is Op.ReadData -> op.onResult(null)
+                else -> Unit
+            }
+        }
     }
 
     private fun authenticate() {
@@ -311,6 +358,7 @@ class PlayerConnection(context: Context) {
                 Op.Discover -> g.discoverServices()
                 Op.Subscribe -> subscribe(g)
                 Op.Read -> stateChar?.let { g.readCharacteristic(it) } ?: false
+                is Op.ReadData -> dataChar?.let { g.readCharacteristic(it) } ?: false
                 is Op.Write -> write(g, op.text)
             }
         } catch (e: Exception) {
@@ -325,6 +373,10 @@ class PlayerConnection(context: Context) {
             Op.Mtu -> pump() // optional: continue with the default MTU
             is Op.Write -> {
                 op.onResult(-1)
+                pump()
+            }
+            is Op.ReadData -> {
+                op.onResult(null)
                 pump()
             }
             else -> fail()
@@ -375,6 +427,78 @@ class PlayerConnection(context: Context) {
         return g.writeCharacteristic(c)
     }
 
+    /** STATE and DATA reads both end here. */
+    private fun onRead(uuid: UUID, value: ByteArray, status: Int) {
+        val op = current
+        complete()
+        when {
+            op is Op.ReadData -> op.onResult(value.takeIf { status == BluetoothGatt.GATT_SUCCESS })
+            uuid == Protocol.STATE && status == BluetoothGatt.GATT_SUCCESS -> onStateBytes(value, fromRead = true)
+        }
+    }
+
+    // --- Cover art and queue ----------------------------------------------------------
+
+    /** Fetches what the state announces and is not here yet: the cover first, then the queue. */
+    private fun fetchMissing() {
+        if (!authorized || transfer != null || dataChar == null) return
+        val state = snapshot.state ?: return
+        if (state.version < 3) return
+        val artId = state.artId
+        if (artId != null && artId !in artCache && tried[Blob.ART] != artId) return startTransfer(Blob.ART, artId)
+        val queueId = state.queueId
+        if (queueId != null && queueId != loadedQueueId && tried[Blob.QUEUE] != queueId) startTransfer(Blob.QUEUE, queueId)
+    }
+
+    private fun startTransfer(blob: Blob, id: String) {
+        tried[blob] = id
+        transfer = Transfer(blob)
+        // Shorter connection interval while pages flow; back to balanced when done.
+        runCatching { gatt?.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH) }
+        requestPage(0)
+    }
+
+    private fun requestPage(index: Int) {
+        val t = transfer ?: return
+        enqueue(Op.Write(Command.GetPage(t.blob, index).wire) { status ->
+            if (transfer !== t) return@Write
+            if (status != Protocol.OK) return@Write finishTransfer(null)
+            enqueue(Op.ReadData { bytes -> onPage(t, index, bytes) })
+        })
+    }
+
+    private fun onPage(t: Transfer, index: Int, bytes: ByteArray?) {
+        if (transfer !== t) return
+        val page = bytes?.let(Protocol::decodePage)
+        val fits = page != null && page.blob == t.blob && page.index == index &&
+            (index == 0 || (page.count == t.count && page.id == t.id))
+        if (!fits) return finishTransfer(null)
+        if (index == 0) {
+            t.count = page!!.count
+            t.id = page.id
+        }
+        t.bytes.write(page!!.payload)
+        if (index + 1 < t.count) requestPage(index + 1) else finishTransfer(t)
+    }
+
+    private fun finishTransfer(done: Transfer?) {
+        transfer = null
+        runCatching { gatt?.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_BALANCED) }
+        val bytes = done?.bytes?.toByteArray()
+        // The content may have changed since the state was sent; keep it under its own id.
+        if (done != null && bytes != null && Protocol.blobId(bytes) == done.id) {
+            val id = Protocol.idText(done.id)
+            when (done.blob) {
+                Blob.ART -> BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.let { artCache[id] = it }
+                Blob.QUEUE -> Protocol.decodeQueue(bytes)?.let {
+                    loadedQueue = it
+                    loadedQueueId = id
+                }
+            }
+        }
+        update() // shows the new cover/queue and fetches whatever is still missing
+    }
+
     private fun onStateBytes(bytes: ByteArray, fromRead: Boolean) {
         val message = Protocol.decodeState(bytes) ?: return
         message.state?.let { update(state = it) }
@@ -404,6 +528,7 @@ class PlayerConnection(context: Context) {
             val service = g.getService(Protocol.SERVICE)
             stateChar = service?.getCharacteristic(Protocol.STATE)
             commandChar = service?.getCharacteristic(Protocol.COMMAND)
+            dataChar = service?.getCharacteristic(Protocol.DATA) // v3 players only
             if (status != BluetoothGatt.GATT_SUCCESS || stateChar == null || commandChar == null) {
                 fail()
                 return@post
@@ -429,20 +554,15 @@ class PlayerConnection(context: Context) {
 
         override fun onCharacteristicRead(
             g: BluetoothGatt, characteristic: BluetoothGattCharacteristic, value: ByteArray, status: Int,
-        ) = post(g) {
-            complete()
-            if (status == BluetoothGatt.GATT_SUCCESS) onStateBytes(value, fromRead = true)
-        }
+        ) = post(g) { onRead(characteristic.uuid, value, status) }
 
         @Deprecated("Android 12 and older")
         @Suppress("DEPRECATION")
         override fun onCharacteristicRead(g: BluetoothGatt, characteristic: BluetoothGattCharacteristic, status: Int) {
             if (Build.VERSION.SDK_INT >= 33) return
             val value = characteristic.value ?: ByteArray(0) // copy now, the object is reused
-            post(g) {
-                complete()
-                if (status == BluetoothGatt.GATT_SUCCESS) onStateBytes(value, fromRead = true)
-            }
+            val uuid = characteristic.uuid
+            post(g) { onRead(uuid, value, status) }
         }
 
         override fun onCharacteristicChanged(
@@ -488,9 +608,14 @@ class PlayerConnection(context: Context) {
         state: PlayerState? = snapshot.state,
     ) {
         val stateTime = if (state != snapshot.state) SystemClock.elapsedRealtime() else snapshot.stateTime
-        val next = Snapshot(phase, deviceName, state, stateTime)
-        if (next == snapshot) return
-        snapshot = next
-        listeners.toList().forEach { it(next) }
+        val art = state?.artId?.let { artCache[it] }
+        // Keep showing the last queue while a changed one is on its way.
+        val queue = if (state?.queueId != null) loadedQueue else null
+        val next = Snapshot(phase, deviceName, state, stateTime, art, queue)
+        if (next != snapshot) {
+            snapshot = next
+            listeners.toList().forEach { it(next) }
+        }
+        fetchMissing()
     }
 }

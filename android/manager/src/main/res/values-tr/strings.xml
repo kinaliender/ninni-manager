@@ -53,4 +53,8 @@
     <string name="pause">Duraklat</string>
     <string name="volume_down">Sesi kıs</string>
     <string name="volume_up">Sesi aç</string>
+    <string name="cover">Kapak</string>
+    <string name="queue">Çalma listesi</string>
+    <string name="queue_failed">Bu parçaya geçilemedi</string>
+    <string name="close">Kapat</string>
 </resources>

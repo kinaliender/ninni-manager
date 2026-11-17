@@ -9,7 +9,8 @@ and with Wi-Fi off so no notification wakes anyone up. **Ninni Player** runs on 
 **Ninni Remote** runs on the parents' phones and controls it from the next room: no Wi-Fi, no
 internet, no account and no server.
 
-- See what is playing, with its progress, and the player phone's battery
+- See what is playing, with its cover, progress and the player phone's battery
+- See the playlist and tap a track to play it
 - Change the volume (the remote's own volume keys work too), play/pause, previous/next track
 - Jump to a position, go 15 s back or forward, toggle shuffle and repeat
 - **Volume limit**: the music never gets louder than the limit, even from the phone's own keys
@@ -63,10 +64,11 @@ On Android 10–11 the remote needs the location permission **and location turne
 | Player screen | `android/player/.../MainActivity.kt` | Pairing code, start/stop, now playing, setup checklist. Dark on purpose |
 | Player service | `android/player/.../PlayerService.kt` | Foreground service: collects the state, runs commands, survives screen-off, restarts after a reboot or update (`BootReceiver.kt`) |
 | Player Bluetooth | `android/player/.../BleServer.kt` | Advertising + GATT server, per-connection code check, notification queue, long reads |
-| Player media | `android/player/.../MediaWatcher.kt`, `MediaListenerService.kt` | Follows the music app's media session: title, position, seek, shuffle/repeat; falls back to media keys |
+| Player media | `android/player/.../MediaWatcher.kt`, `MediaListenerService.kt` | Follows the music app's media session: title, position, seek, shuffle/repeat, play queue; falls back to media keys |
+| Cover art | `android/player/.../Artwork.kt` | Turns the track's cover into a small JPEG that the remotes fetch page by page |
 | Sleep timer | `android/player/.../SleepTimer.kt` | Fades the volume out step by step, pauses, then puts the volume back once the music has stopped |
-| Remote screen | `android/manager/.../MainActivity.kt` | Big buttons, progress, volume and limit, sleep timer, battery; the phone's volume keys control the player while the app is open |
-| Remote Bluetooth | `android/manager/.../PlayerConnection.kt` | Scan by service UUID, GATT operation queue, pairing code, reconnect with backoff |
+| Remote screen | `android/manager/.../MainActivity.kt`, `QueueAdapter.kt` | Big buttons, cover, progress, playlist, volume and limit, sleep timer, battery; the phone's volume keys control the player while the app is open |
+| Remote Bluetooth | `android/manager/.../PlayerConnection.kt` | Scan by service UUID, GATT operation queue, pairing code, reconnect with backoff, fetching covers and the queue |
 
 No third-party libraries: only `androidx.core`, plus `androidx.media` on the player for
 shuffle/repeat.

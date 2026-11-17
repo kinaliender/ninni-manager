@@ -1,8 +1,10 @@
 package com.ender.ninniplayer
 
+import com.ender.ninni.protocol.Blob
 import com.ender.ninni.protocol.Command
 import com.ender.ninni.protocol.PlayerState
 import com.ender.ninni.protocol.Protocol
+import com.ender.ninni.protocol.Queue
 import com.ender.ninni.protocol.Sleep
 import android.Manifest
 import android.app.NotificationChannel
@@ -69,12 +71,17 @@ class PlayerService : Service() {
     private lateinit var media: MediaWatcher
     private lateinit var ble: BleServer
     private lateinit var sleepTimer: SleepTimer
+    private lateinit var artwork: Artwork
     private var started = false
     private var battery = -1
     private var charging = false
     /** Highest music volume step allowed; null = no limit. */
     private var volumeCap: Int? = null
     private var lastState: PlayerState? = null
+    /** The queue [queueBytes] was made from; re-encoded only when the music app changes it. */
+    private var queueSource: Queue? = null
+    private var queueBytes: ByteArray? = null
+    private var queueId: Int? = null
 
     private val pushRunnable = Runnable { pushState() }
 
@@ -118,8 +125,9 @@ class PlayerService : Service() {
         }
         instance = this
         audio = getSystemService(AudioManager::class.java)
-        media = MediaWatcher(this, handler, ::scheduleUpdate)
-        ble = BleServer(this, handler, ::execute)
+        artwork = Artwork(this, handler, ::scheduleUpdate)
+        media = MediaWatcher(this, handler, ::scheduleUpdate, artwork::update)
+        ble = BleServer(this, handler, ::execute, ::content)
         sleepTimer = SleepTimer(this, handler, audio, media::pause, ::volumeLimit, ::scheduleUpdate)
         volumeCap = Prefs.volumeCap(this)
         enforceVolumeCap()
@@ -175,6 +183,10 @@ class PlayerService : Service() {
         if (started) pushState()
         writer.println("state=${lastState?.let { String(Protocol.encodeState(it)) }}")
         writer.println("status=${Status.current.copy(state = null)}")
+        writer.println("art=${artwork.bytes?.size ?: 0} bytes")
+        val queue = queueSource
+        writer.println("queue=${queue?.items?.size ?: 0} items, ${queueBytes?.size ?: 0} bytes, title=${queue?.title}")
+        queue?.items?.forEach { writer.println("  ${it.id}  ${it.title}  /  ${it.artist}") }
     }
 
     override fun onDestroy() {
@@ -184,6 +196,7 @@ class PlayerService : Service() {
             sleepTimer.release()
             ble.stop()
             media.stop()
+            artwork.release() // after media.stop(), which still hands it the empty metadata
         }
         if (instance === this) instance = null
         Status.update { Status.Snapshot() }
@@ -233,6 +246,8 @@ class PlayerService : Service() {
             Command.Forward -> return media.skip(Protocol.SKIP_SECONDS * 1_000L)
             Command.Rewind -> return media.skip(-Protocol.SKIP_SECONDS * 1_000L)
             is Command.Seek -> return media.seekTo(command.positionMs)
+            is Command.PlayItem -> return media.playItem(command.id)
+            is Command.GetPage -> return false // answered by BleServer
             is Command.SetShuffle -> return media.setShuffle(command.on)
             is Command.SetRepeat -> return media.setRepeat(command.mode)
             // Flags 0: no on-screen volume panel and no beep.
@@ -259,6 +274,11 @@ class PlayerService : Service() {
         return true
     }
 
+    private fun content(blob: Blob): ByteArray? = when (blob) {
+        Blob.ART -> artwork.bytes
+        Blob.QUEUE -> queueBytes
+    }
+
     /** The cap, or the phone's maximum when there is none. */
     private fun volumeLimit(): Int = volumeCap ?: audio.getStreamMaxVolume(STREAM)
 
@@ -283,6 +303,12 @@ class PlayerService : Service() {
     private fun pushState() {
         if (!started) return
         val info = media.info()
+        val queue = media.queue
+        if (queue !== queueSource) {
+            queueSource = queue
+            queueBytes = queue?.let(Protocol::encodeQueue)?.takeIf { it.size <= Protocol.MAX_BLOB }
+            queueId = queueBytes?.let(Protocol::blobId)
+        }
         val state = PlayerState(
             playing = info.playing ?: audio.isMusicActive,
             title = info.title,
@@ -300,6 +326,9 @@ class PlayerService : Service() {
             sleep = sleepTimer.remainingMs()?.let { remaining ->
                 Sleep(((remaining + 999) / 1_000).toInt(), (sleepTimer.fadeLengthMs / 1_000).toInt())
             },
+            artId = artwork.id?.let(Protocol::idText),
+            queueId = queueId?.let(Protocol::idText),
+            queueActive = info.queueActive.takeIf { queueId != null },
         )
         if (state == lastState) return
         lastState = state
